@@ -1,36 +1,62 @@
-# This is a basic workflow to help you get started with Actions
+name: CI/CD for Angular Project
 
-name: CI
-
-# Controls when the workflow will run
+# Ausführung bei allen Push- und Pull-Request in dem Main-Branch
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+    working-directory: ./programmierprojekt
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    name: Build and Test Angular App
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    strategy:
+      matrix:
+        node-version: [22.x]
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      # Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      # Set up Node.js environment
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+      # Install Dependencies
+      - name: Install Dependencies
+        run: npm install -g @angular/cli@18
+
+      # Stage: Linting
+      - name: Install ESLint
+        run: ng add @angular-eslint/schematics --skip-confirmation
+      - name: Run Linter
+        run:  ng lint
+
+      # Stage: SCA
+      - name: Install Snyk
+        run: npm install -g snyk
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+      - name: Test configuration
+        run: snyk test
+      - name: Code analysis
+        run: snyk code test
+      - name: Transfer results
+        run: snyk monitor
+        
+      # Stage: Test-Headless
+      - name: Run Headless Test in Chrome
+        run: ng test --watch=false --browsers=ChromeHeadless
